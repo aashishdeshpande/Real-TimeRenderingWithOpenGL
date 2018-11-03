@@ -1,0 +1,657 @@
+#include <windows.h>
+#include <gl/GL.h>
+#include <GL/glu.h>
+#define _USE_MATH_DEFINES 1 //use before math.h
+#include <math.h>
+#include<mmsystem.h>
+#define WIN_WIDTH 800
+#define WIN_HEIGHT 800
+
+#pragma comment(lib,"opengl32.lib")
+#pragma comment(lib,"glu32.lib")
+#pragma comment(lib,"Winmm.lib")
+
+GLfloat tri = 0.0f;
+GLfloat rect = 0.0f;
+const float PI = 3.1415f;
+
+//Prototype Of WndProc() declared Globally
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+
+//Global variable declarations
+HWND ghwnd = NULL;
+HDC ghdc = NULL;
+HGLRC ghrc = NULL;
+
+DWORD dwStyle;
+WINDOWPLACEMENT wpPrev = { sizeof(WINDOWPLACEMENT) };
+
+bool gbActiveWindow = false;
+bool gbEscapeKeyIsPressed = false;
+bool gbFullscreen = false;
+
+//main()
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int iCmdShow)
+{
+	//function prototype
+	void initialize(void);
+	void uninitialize(void);
+	void display(void);
+	//void spin(void);
+	//variable declaration
+	WNDCLASSEX wndclass;
+	HWND hwnd;
+	MSG msg;
+	TCHAR szClassName[] = TEXT("RTROGL");
+	bool bDone = false;
+
+	//code
+	//initializing members of struct WNDCLASSEX
+	wndclass.cbSize = sizeof(WNDCLASSEX);
+	wndclass.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+	wndclass.cbClsExtra = 0;
+	wndclass.cbWndExtra = 0;
+	wndclass.hInstance = hInstance;
+	wndclass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+	wndclass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+	wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wndclass.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
+	wndclass.lpfnWndProc = WndProc;
+	wndclass.lpszClassName = szClassName;
+	wndclass.lpszMenuName = NULL;
+
+	//Registering Class
+	RegisterClassEx(&wndclass);
+	int x = GetSystemMetrics(SM_CXSCREEN);
+	int y = GetSystemMetrics(SM_CYSCREEN);
+	//Create Window
+	hwnd = CreateWindowEx(WS_EX_APPWINDOW,
+		szClassName,
+		TEXT("TIRANGA"),
+		WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE,
+		(x / 2) - (WIN_WIDTH / 2),
+		(y / 2) - (WIN_HEIGHT / 2),
+		WIN_WIDTH,
+		WIN_HEIGHT,
+		NULL,
+		NULL,
+		hInstance,
+		NULL);
+
+	ghwnd = hwnd;
+
+	//initialize
+	initialize();
+
+	ShowWindow(hwnd, SW_SHOW);
+	SetForegroundWindow(hwnd);
+	SetFocus(hwnd);
+
+	//Message Loop
+	while (bDone == false)
+	{
+		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		{
+			if (msg.message == WM_QUIT)
+				bDone = true;
+			else
+			{
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
+		}
+		else
+		{
+			if (gbActiveWindow == true)
+			{
+				if (gbEscapeKeyIsPressed == true)
+					bDone = true;
+				display();
+			}
+		}
+	}
+
+	uninitialize();
+	return((int)msg.wParam);
+}
+
+//WndProc()
+LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
+{
+	//function prototype
+
+	void resize(int, int);
+	void ToggleFullscreen(void);
+	void uninitialize(void);
+
+	//code
+	switch (iMsg)
+	{
+
+	case WM_CREATE:
+		PlaySound(TEXT("SJA.wav"), NULL, SND_FILENAME|SND_ASYNC);
+		break;
+	case WM_ACTIVATE:
+		if (HIWORD(wParam) == 0)
+			gbActiveWindow = true;
+		else
+			gbActiveWindow = false;
+		break;
+		//case WM_PAINT:
+		//display();
+		//break;
+		//case WM_ERASEBKGND:
+		//return(0);
+	case WM_SIZE:
+		resize(LOWORD(lParam), HIWORD(lParam));
+		break;
+	case WM_KEYDOWN:
+		switch (wParam)
+		{
+		case VK_ESCAPE:
+			gbEscapeKeyIsPressed = true;
+			break;
+		case 0x46: //for 'f' or 'F'
+			if (gbFullscreen == false)
+			{
+				ToggleFullscreen();
+				gbFullscreen = true;
+			}
+			else
+			{
+				ToggleFullscreen();
+				gbFullscreen = false;
+			}
+			break;
+
+		case 'l':
+
+			break;
+
+		default:
+			break;
+		}
+		break;
+	case WM_LBUTTONDOWN:
+		break;
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		break;
+	default:
+		break;
+	}
+	return(DefWindowProc(hwnd, iMsg, wParam, lParam));
+}
+
+void ToggleFullscreen(void)
+{
+	//variable declarations
+	MONITORINFO mi;
+
+	//code
+	if (gbFullscreen == false)
+	{
+		dwStyle = GetWindowLong(ghwnd, GWL_STYLE);
+		if (dwStyle & WS_OVERLAPPEDWINDOW)
+		{
+			mi = { sizeof(MONITORINFO) };
+			if (GetWindowPlacement(ghwnd, &wpPrev) && GetMonitorInfo(MonitorFromWindow(ghwnd, MONITORINFOF_PRIMARY), &mi))
+			{
+				SetWindowLong(ghwnd, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
+				SetWindowPos(ghwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top, SWP_NOZORDER | SWP_FRAMECHANGED);
+			}
+		}
+		ShowCursor(FALSE);
+	}
+
+	else
+	{
+		//code
+		SetWindowLong(ghwnd, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
+		SetWindowPlacement(ghwnd, &wpPrev);
+		SetWindowPos(ghwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_FRAMECHANGED);
+
+		ShowCursor(TRUE);
+	}
+}
+
+void initialize(void)
+{
+	//function prototypes
+	void resize(int, int);
+
+	//variable declarations
+	PIXELFORMATDESCRIPTOR pfd;
+	int iPixelFormatIndex;
+
+	//code
+	ZeroMemory(&pfd, sizeof(PIXELFORMATDESCRIPTOR));
+
+	//Initialization of structure 'PIXELFORMATDESCRIPTOR'
+	pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+	pfd.nVersion = 1;
+	pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+	pfd.iPixelType = PFD_TYPE_RGBA;
+	pfd.cColorBits = 32;
+	pfd.cRedBits = 8;
+	pfd.cGreenBits = 8;
+	pfd.cBlueBits = 8;
+	pfd.cAlphaBits = 8;
+
+	ghdc = GetDC(ghwnd);
+
+	iPixelFormatIndex = ChoosePixelFormat(ghdc, &pfd);
+	if (iPixelFormatIndex == 0)
+	{
+		ReleaseDC(ghwnd, ghdc);
+		ghdc = NULL;
+	}
+
+	if (SetPixelFormat(ghdc, iPixelFormatIndex, &pfd) == FALSE)
+	{
+		ReleaseDC(ghwnd, ghdc);
+		ghdc = NULL;
+	}
+
+	ghrc = wglCreateContext(ghdc);
+	if (ghrc == NULL)
+	{
+		ReleaseDC(ghwnd, ghdc);
+		ghdc = NULL;
+	}
+
+	if (wglMakeCurrent(ghdc, ghrc) == FALSE)
+	{
+		wglDeleteContext(ghrc);
+		ghrc = NULL;
+		ReleaseDC(ghwnd, ghdc);
+		ghdc = NULL;
+	}
+
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+
+	resize(WIN_WIDTH, WIN_HEIGHT);
+}
+
+void display(void)
+{
+	//code
+	void drawPole(void);
+	void drawFlag(void);
+	void drawSteps(void);
+	void drawAshokChakra(void);
+	void drawHoisters(void);
+	void drawSun(void);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	gluLookAt(0.0f, 0.0f, 3.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	//glTranslatef(0.0f, 0.0f, -5.0f);
+	drawPole();
+	drawSteps();
+	drawFlag();
+	glTranslatef(0.27f, 0.0f, 0.0f);
+	drawAshokChakra();
+	drawHoisters();
+	drawSun();
+	SwapBuffers(ghdc);
+}
+
+void drawPole(void)
+{
+	glBegin(GL_QUADS);
+
+	glColor3f(0.5f, 0.5f, 0.5f);
+	glVertex3f(-0.7f, 0.8f, 0.0f);
+	glVertex3f(-0.7f, -0.7f, 0.0f);
+	glVertex3f(-0.65f, -0.7f, 0.0f);
+	glVertex3f(-0.65f, 0.8f, 0.0f);
+	glEnd();
+}
+
+void drawSteps(void)
+{
+	glColor3f(1.0f, 1.0f, 1.0f);
+	glBegin(GL_QUADS);
+	glVertex3f(-0.9f, -0.7f, 0.0f);
+	glVertex3f(-0.9f, -0.9f, 0.0f);
+	glVertex3f(-0.45f, -0.9f, 0.0f);
+	glVertex3f(-0.45f, -0.7f, 0.0f);
+	glEnd();
+}
+
+void drawFlag(void)
+{
+	glBegin(GL_QUADS);
+	glColor3f(1.0f, 0.5f, 0.0f);
+	glVertex3f(-0.67f, 0.8f, 0.0f);
+	glVertex3f(-0.67f, 0.6f, 0.0f);
+	glVertex3f(-0.1f, 0.6f, 0.0f);
+	glVertex3f(-0.1f, 0.8f, 0.0f);
+	glEnd();
+
+
+	glBegin(GL_QUADS);
+	glColor3f(1.0f, 1.0f, 1.0f);
+	glVertex3f(-0.67f, 0.6f, 0.0f);
+	glVertex3f(-0.67f, 0.4f, 0.0f);
+	glVertex3f(-0.1f, 0.4f, 0.0f);
+	glVertex3f(-0.1f, 0.6f, 0.0f);
+	glEnd();
+
+	glBegin(GL_QUADS);
+	glColor3f(0.0f, 1.0f, 0.0f);
+	glVertex3f(-0.67f, 0.4f, 0.0f);
+	glVertex3f(-0.67f, 0.2f, 0.0f);
+	glVertex3f(-0.1f, 0.2f, 0.0f);
+	glVertex3f(-0.1f, 0.4f, 0.0f);
+	glEnd();
+}
+
+void drawAshokChakra(void)
+{
+
+	GLfloat fradius = 0.1f;
+	GLfloat x = -0.67f;
+	GLfloat y = 0.5f;
+	GLfloat z = 0.0f;
+	glEnable(GL_POINT_SMOOTH);
+	glColor3f(0.0f, 0.0f, 1.0f);
+	glLineWidth(2.0f);
+	glBegin(GL_LINES);
+	for (GLfloat fangle = 0.0f; fangle < M_PI; fangle+=(M_PI/10.0f))
+	{
+		GLfloat l = x+fradius*sin(fangle);
+		GLfloat m = y+fradius*cos(fangle);
+		glVertex3f(l, m, z);
+
+		GLfloat n = x+fradius*sin(fangle +M_PI);
+		GLfloat p= y+fradius*cos(fangle + M_PI);
+		glVertex3f(n, p, z);
+	}
+	glEnd();
+
+	GLfloat ACfradius = 0.1f;
+	GLfloat ACx = -0.67f;
+	GLfloat ACy = 0.5f;
+	GLfloat ACz = 0.0f;
+
+	glBegin(GL_POINTS);
+	for (GLfloat fangle = 0.0f; fangle <2 * M_PI; fangle += 0.01f)
+	{
+		glVertex3f(ACfradius*cos(fangle) + ACx, ACfradius*sin(fangle)+ACy, 0.0f);
+	}
+	glEnd();
+
+	// draw the lines
+	/*glLineWidth(2.0f);
+
+	glBegin(GL_LINES);
+	glVertex3f(-0.67f, 0.4, 0.0f);
+	glVertex3f(-0.67f, 0.6f, 0.0f);
+	glEnd();
+
+	glBegin(GL_LINES);
+	glVertex3f(-0.77f, 0.5, 0.0f);
+	glVertex3f(-0.57f, 0.5f, 0.0f);
+	glEnd();
+
+	glBegin(GL_LINES);
+	glVertex3f(-0.76f, 0.55, 0.0f);
+	glVertex3f(-0.58f, 0.45f, 0.0f);
+	glEnd();
+
+	glBegin(GL_LINES);
+	glVertex3f(-0.76f, 0.45, 0.0f);
+	glVertex3f(-0.58f, 0.55f, 0.0f);
+	glEnd();
+
+	glBegin(GL_LINES);
+	glVertex3f(-0.74f, 0.43, 0.0f);
+	glVertex3f(-0.60f, 0.57f, 0.0f);
+	glEnd();
+
+	glBegin(GL_LINES);
+	glVertex3f(-0.75f, 0.57, 0.0f);
+	glVertex3f(-0.60f, 0.43f, 0.0f);
+	glEnd();
+
+	glBegin(GL_LINES);
+	glVertex3f(-0.74f, 0.58, 0.0f);
+	glVertex3f(-0.61f, 0.44f, 0.0f);
+	glEnd();*/
+}
+
+void drawHoisters(void)
+{
+	GLfloat x = 0.15f;
+	GLfloat y = 0.0f;
+	GLfloat fradius = 0.1f;
+	glBegin(GL_POINTS);
+	for (GLfloat fangle = 0.0f; fangle < 2 * PI; fangle+=0.01f)
+	{
+		glVertex3f(fradius*cos(fangle) + x, fradius*sin(fangle), 0.0f);
+	}
+	glEnd();
+
+	/*glBegin(GL_POLYGON);//For Hair
+	glVertex3f(0.06f, 0.15f, 0.0f);
+	glVertex3f(0.06f, 0.1f, 0.0f);
+	glVertex3f(0.24f, 0.1f, 0.0f);
+	glVertex3f(0.24f, 0.15f, 0.0f);
+	glEnd();*/
+	
+	glColor3f(0.858824, 0.576471, 0.439216);
+	glPointSize(4.0f);
+	//glEnable(GL_POINT_SMOOTH);
+	//glColor3f(1.0f, 1.0f, 0.0f);
+	glBegin(GL_POINTS);
+	glVertex3f(0.19f, 0.02f, 0.0f);
+	glEnd();
+
+	glPointSize(4.0f);
+	//glEnable(GL_POINT_SMOOTH);
+	//glColor3f(1.0f, 1.0f, 0.0f);
+	glBegin(GL_POINTS);
+	glVertex3f(0.11f, 0.02f, 0.0f);
+	glEnd();
+
+	glLineWidth(2.0f);
+	glEnable(GL_LINE_SMOOTH);
+	glBegin(GL_LINES);
+	glVertex3f(0.15f, 0.0f, 0.0f);
+	glVertex3f(0.15f,-0.022f, 0.0f);
+	glEnd();
+
+	glLineWidth(2.0f);
+	glEnable(GL_LINE_SMOOTH);
+	glBegin(GL_LINES);
+	glVertex3f(0.15f, -0.022f, 0.0f);
+	glVertex3f(0.165f, -0.022f, 0.0f);
+	glEnd();
+
+	glLineWidth(2.0f);
+	glEnable(GL_LINE_SMOOTH);
+	glBegin(GL_LINES);
+	glVertex3f(0.13f, -0.05f, 0.0f);
+	glVertex3f(0.18f, -0.05f, 0.0f);
+	glEnd();
+
+	
+	glBegin(GL_QUADS);
+	glVertex3f(0.15f, -0.1f, 0.0f);
+	glVertex3f(0.15f, -0.15f, 0.0f);
+	glVertex3f(0.17f, -0.15f, 0.0f);
+	glVertex3f(0.17f, -0.1f, 0.0f);
+	glEnd();
+
+	glColor3f(0.5f, 0.5f, 0.0f);
+	glBegin(GL_QUADS);
+	glVertex3f(0.08f, -0.15f, 0.0f);
+	glVertex3f(0.08f, -0.4f, 0.0f);
+	glVertex3f(0.25f, -0.4f, 0.0f);
+	glVertex3f(0.25f, -0.15f, 0.0f);
+	glEnd();
+
+	glColor3f(0.0f, 0.0f, 1.0f);
+	glBegin(GL_QUADS);
+	glVertex3f(0.10f, -0.4f, 0.0f);
+	glVertex3f(0.10f, -0.5f, 0.0f);
+	glVertex3f(0.13f, -0.5f, 0.0f);
+	glVertex3f(0.13f, -0.4f, 0.0f);
+	glEnd();
+
+	glColor3f(0.0f, 0.0f, 1.0f);
+	glBegin(GL_QUADS);
+	glVertex3f(0.20f, -0.4f, 0.0f);
+	glVertex3f(0.20f, -0.5f, 0.0f);
+	glVertex3f(0.23f, -0.5f, 0.0f);
+	glVertex3f(0.23f, -0.4f, 0.0f);
+	glEnd();
+
+	glColor3f(0.0f, 0.0f, 1.0f);
+	glBegin(GL_QUADS);
+	glVertex3f(0.04f, -0.15f, 0.0f);
+	glVertex3f(0.04f, -0.18f, 0.0f);
+	glVertex3f(0.08f, -0.18f, 0.0f);
+	glVertex3f(0.08f, -0.15f, 0.0f);
+	glEnd();
+
+	glColor3f(0.0f, 0.0f, 1.0f);
+	glBegin(GL_QUADS);
+	glVertex3f(0.25f, -0.15f, 0.0f);
+	glVertex3f(0.25f, -0.20f, 0.0f);
+	glVertex3f(0.27f, -0.20f, 0.0f);
+	glVertex3f(0.27f, -0.15f, 0.0f);
+	glEnd();
+
+	glColor3f(0.858824, 0.576471, 0.439216);//hand
+	glBegin(GL_QUADS);
+	glVertex3f(0.05f, 0.0f, 0.0f);
+	glVertex3f(0.04f, -0.15f, 0.0f);
+	glVertex3f(0.06f, -0.15f, 0.0f);
+	glVertex3f(0.06f, -0.01f, 0.0f);
+	glEnd();
+
+	//glColor3f(0.858824, 0.576471, 0.439216);
+	glBegin(GL_QUADS);
+	glVertex3f(0.25f, -0.20f, 0.0f);
+	glVertex3f(0.25f, -0.32f, 0.0f);
+	glVertex3f(0.27f, -0.32f, 0.0f);
+	glVertex3f(0.27f, -0.20f, 0.0f);
+	glEnd();
+///////
+	//glColor3f(0.858824, 0.576471, 0.439216);
+	glBegin(GL_TRIANGLES);
+	glVertex3f(0.18f, -0.5f, 0.0f);
+	glVertex3f(0.23f, -0.5f, 0.0f);
+	glVertex3f(0.23f, -0.53f, 0.0f);
+	glEnd();
+
+	//glColor3f(0.858824f, 0.576471f, 0.439216f);
+	glBegin(GL_TRIANGLES);
+	glVertex3f(0.18f, -0.5f, 0.0f);
+	glVertex3f(0.23f, -0.5f, 0.0f);
+	glVertex3f(0.23f, -0.53f, 0.0f);
+	glEnd();
+
+	//glColor3f(0.858824f, 0.576471f, 0.439216f);
+	glBegin(GL_TRIANGLES);
+	glVertex3f(0.08f, -0.5f, 0.0f);
+	glVertex3f(0.13f, -0.5f, 0.0f);
+	glVertex3f(0.13f, -0.53f, 0.0f);
+	glEnd();
+
+}
+
+void drawSun(void)
+{
+	glColor3f(1.0f, 0.4f, 0.0f);
+	glPointSize(2.0f);
+	glEnable(GL_POINT_SMOOTH);
+	GLfloat x = 0.5f;
+	GLfloat y = 0.7f;
+	GLfloat fradius = 0.1f;
+	for (GLfloat fangle = 0.0f; fangle < M_PI; fangle+=(M_PI/25))
+	{
+		glBegin(GL_LINES);
+		glColor3f(1.0f, 0.9f, 0.0f);
+		GLfloat m = x + fradius*sin(fangle);
+		GLfloat n = y + fradius*cos(fangle);
+		glVertex3f(m,n, 0.0f);
+
+		GLfloat p = x + fradius*sin(fangle + M_PI);
+		GLfloat q = y + fradius*cos(fangle + M_PI);
+		glVertex3f(p, q, 0.0f);
+		glEnd();
+	}
+
+	/*glLineWidth(2.0f);
+	glEnable(GL_LINE_SMOOTH);
+	glBegin(GL_LINES);
+	//for(x=0.6f,y=0.8f)
+	glVertex3f(0.25f, 0.7f, 0.0f);//left
+	glVertex3f(0.4f, 0.7f, 0.0f);//left
+	glVertex3f(0.6f, 0.7f, 0.0f);//ri
+	glVertex3f(0.75f, 0.7f, 0.0f);//ri
+	glVertex3f(0.5f, 0.6f, 0.0f);//up
+	glVertex3f(0.5f, 0.45f, 0.0f);//up
+	glVertex3f(0.5f, 0.8f, 0.0f);//dw
+	glVertex3f(0.5f, 0.95f, 0.0f);//dw
+	glVertex3f(0.56f, 0.77f, 0.0f);
+	glVertex3f(0.65f, 0.87f, 0.0f);
+	glVertex3f(0.42f, 0.63f, 0.0f);
+	glVertex3f(0.32f, 0.55f, 0.0f);
+	//glVertex3f();
+	//glVertex3f();
+	glEnd();*/
+
+}
+void resize(int width, int height)
+{
+	//code
+	if (height == 0)
+		height = 1;
+	glViewport(0, 0, (GLsizei)width, (GLsizei)height);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	/*if (width <= height)
+	{
+		glFrustum(-1.0f, 1.0f, -1.0f * (GLfloat)height / width, 1.0f * (GLfloat)height / width, 0.1f, 100.0f);
+	}
+
+	else
+	{
+		glFrustum(-1.0f * (GLfloat)width / height, 1.0f * (GLfloat)width / height, -1.0f, 1.0f, 0.1f, 100.0f);
+	}*/
+
+	gluPerspective(45.0f, (GLfloat)width / (GLfloat)height, 0.1f, 100.0f);
+}
+
+void uninitialize(void)
+{
+	//UNINITIALIZATION CODE
+
+	if (gbFullscreen == true)
+	{
+		dwStyle = GetWindowLong(ghwnd, GWL_STYLE);
+		SetWindowLong(ghwnd, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
+		SetWindowPlacement(ghwnd, &wpPrev);
+		SetWindowPos(ghwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_FRAMECHANGED);
+
+		ShowCursor(TRUE);
+
+	}
+
+	wglMakeCurrent(NULL, NULL);
+
+	wglDeleteContext(ghrc);
+	ghrc = NULL;
+
+	ReleaseDC(ghwnd, ghdc);
+	ghdc = NULL;
+
+	DestroyWindow(ghwnd);
+	ghwnd = NULL;
+}
+

@@ -1,0 +1,7 @@
+Log File is Successfully Opened.
+Entering Main
+Entering inti
+Entering LoadGLTextures
+Leaving LoadGLTextures
+Laeving inti
+Log File is Successfully closed

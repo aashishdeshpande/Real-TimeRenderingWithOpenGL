@@ -1,0 +1,116 @@
+#include<gl/freeglut.h>
+#include<math.h>
+#define WIN_WIDTH 600
+#define WIN_HEIGHT 600
+bool bFullscreen = false;
+const float PI= 3.1415926535898;
+GLint circle_points = 1000;
+int main(int argc, char **argv)
+{
+	void display(void);
+	void resize(int, int);
+	void keyboard(unsigned char, int, int);
+	void mouse(int, int, int, int);
+	void initialize(void);
+	void uninitialize(void);
+	int x = GetSystemMetrics(SM_CXSCREEN);
+	int y = GetSystemMetrics(SM_CYSCREEN);
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+	glutInitWindowSize(WIN_WIDTH, WIN_HEIGHT);
+	glutInitWindowPosition((x / 2) - (WIN_WIDTH / 2), (y / 2) - (WIN_HEIGHT / 2));
+	//glutInitWindowPosition(100, 100);
+	glutCreateWindow("Glut:Kundali");
+	initialize();
+	glutDisplayFunc(display);
+	glutReshapeFunc(resize);
+	glutKeyboardFunc(keyboard);
+	glutMouseFunc(mouse);
+	glutCloseFunc(uninitialize);
+	glutMainLoop();
+	return(0);
+
+}
+
+void display(void)
+{
+	void drawCircles(void);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	drawCircles();
+	glutSwapBuffers();
+
+}
+
+void drawCircles(void)
+{
+	float color[] = { 1.0f,0.0f,0.0f,0.0f,1.0f,0.0f,0.0f,0.0f,1.0f,1.0f,1.0f,0.0f,1.0f,0.0f,1.0f,0.0f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,0.5f,0.0f,0.5f,0.5f,0.5f,0.7f,0.5f,0.2f };
+	float angle, x;
+	int i = 0;
+	for (x = 0.1f; x < 1.1f; x += 0.1f)
+	{
+		glBegin(GL_POINTS);
+		glColor3f(color[i], color[i + 1], color[i + 2]);
+		i = i + 3;
+		for (angle = 0.0f; angle < 2.0f*PI; angle = angle + 0.0001f)
+		{
+			glVertex3f(x*(cos(angle)), x*(sin(angle)), 0.0f);
+		}
+		glEnd();
+	}
+}
+
+void initialize(void)
+{
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+}
+void keyboard(unsigned char key, int x, int y)
+{
+	switch (key)
+	{
+	case 27:
+		glutLeaveMainLoop();
+		break;
+
+	case 'F':
+	case 'f':
+		if (bFullscreen == false)
+		{
+			glutFullScreen();
+			bFullscreen = true;
+		}
+		else
+		{
+			glutLeaveFullScreen();
+			bFullscreen = false;
+		}
+		break;
+
+	default:
+		break;
+	}
+}
+
+void mouse(int button, int state, int x, int y)
+{
+	switch (button)
+	{
+	case GLUT_LEFT_BUTTON:
+		break;
+	default:
+		break;
+	}
+}
+
+void resize(int width, int height)
+{
+	if (height == 0)
+		height = 1;
+	glViewport(0, 0, (GLsizei)width, (GLsizei)height);
+}
+
+void uninitialize(void)
+{
+
+}

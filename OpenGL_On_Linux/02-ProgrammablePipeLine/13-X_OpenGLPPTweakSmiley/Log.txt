@@ -1,0 +1,3 @@
+Log File Is Successfully Opened.
+Entering LoadGLTextures
+Leaving LoadGLTextures
